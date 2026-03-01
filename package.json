@@ -1,0 +1,24 @@
+{
+  "name": "persona",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch",
+    "prebuild": "svelte-check --tsconfig ./tsconfig.json",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "svelte": "^5.0.0"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
+    "@tsconfig/svelte": "^5.0.0",
+    "@types/chrome": "^0.0.305",
+    "svelte-check": "^4.4.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.0"
+  }
+}
