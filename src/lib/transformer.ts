@@ -48,9 +48,14 @@ export async function rewriteText(
     },
   ];
 
+  const TOKEN_MULTIPLIER = 2;
+  const MIN_BASE_TOKENS = 200;
+  const TOKEN_BUFFER = 100;
+  const MAX_TOTAL_TOKENS = 1000;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = await generatorInstance!(messages, {
-    max_new_tokens: Math.min(Math.max(text.length * 2, 200) + 100, 1000),
+    max_new_tokens: Math.min(Math.max(text.length * TOKEN_MULTIPLIER, MIN_BASE_TOKENS) + TOKEN_BUFFER, MAX_TOTAL_TOKENS),
     temperature: 0.7,
     do_sample: true,
     return_full_text: false,
