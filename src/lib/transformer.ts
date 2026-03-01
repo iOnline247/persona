@@ -4,6 +4,11 @@ import { pipeline, env } from '@huggingface/transformers';
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 
+// Force single-threaded WASM to avoid SharedArrayBuffer / cross-origin isolation
+// requirements that cause ort-wasm-simd-threaded.jsep to abort in extension contexts.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(env.backends.onnx as any).wasm = { ...(env.backends.onnx as any).wasm, numThreads: 1 };
+
 const MODEL_ID = 'HuggingFaceTB/SmolLM2-135M-Instruct';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let generatorInstance: any | null = null;
@@ -21,9 +26,11 @@ export async function loadModel(onProgress?: ProgressCallback): Promise<void> {
       progress_callback: onProgress,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as Promise<any>).catch(() => {
-      // Fallback to WASM if WebGPU not available
+      // Fallback to WASM — explicitly set device:'wasm' so the non-JSEP
+      // WASM backend is loaded instead of the WebGPU JSEP variant.
       return pipeline('text-generation', MODEL_ID, {
         dtype: 'q4',
+        device: 'wasm',
         progress_callback: onProgress,
       });
     });
@@ -48,32 +55,28 @@ export async function rewriteText(
     },
   ];
 
+  // Build the prompt string via the tokenizer's chat template, matching the
+  // pattern recommended for Transformers.js 3.x instruction-tuned models.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prompt: string = generatorInstance!.tokenizer.apply_chat_template(messages, {
+    add_generation_prompt: true,
+    tokenize: false,
+  }) as string;
+
   const TOKEN_MULTIPLIER = 2;
   const MIN_BASE_TOKENS = 200;
   const TOKEN_BUFFER = 100;
   const MAX_TOTAL_TOKENS = 1000;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const result = await generatorInstance!(messages, {
+  const result: any[] = await generatorInstance!(prompt, {
     max_new_tokens: Math.min(Math.max(text.length * TOKEN_MULTIPLIER, MIN_BASE_TOKENS) + TOKEN_BUFFER, MAX_TOTAL_TOKENS),
     temperature: 0.7,
     do_sample: true,
     return_full_text: false,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const output = Array.isArray(result) ? result[0] : result;
-  if (output && typeof output === 'object' && 'generated_text' in output) {
-    const generated = output.generated_text;
-    if (Array.isArray(generated)) {
-      const lastMsg = generated[generated.length - 1];
-      return typeof lastMsg === 'object' && 'content' in lastMsg
-        ? (lastMsg.content as string).trim()
-        : String(lastMsg).trim();
-    }
-    return String(generated).trim();
-  }
-  return String(output).trim();
+  return String(result[0].generated_text).trim();
 }
 
 export function isModelLoaded(): boolean {
