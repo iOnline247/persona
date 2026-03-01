@@ -24,6 +24,7 @@
   let outputText = $state('');
   let selectedPersonaId = $state<string>('random');
   let isConverting = $state(false);
+  let convertCompleted = $state(false);
   let modelStatus = $state<'idle' | 'loading' | 'ready' | 'error'>('idle');
   let modelProgress = $state(0);
   let modelStatusText = $state('');
@@ -152,6 +153,7 @@
           : findPersona(selectedPersonaId)!;
       lastUsedPersonaId = persona.id;
       outputText = await rewriteText(inputText, persona.systemPrompt);
+      convertCompleted = true;
       await recordUsage(persona.id, inputText.length);
       const data = await getStorage();
       usageStats = data.usageStats;
@@ -438,11 +440,13 @@
         </div>
 
         <div class="output-actions">
-          <button class="btn btn-secondary" onclick={handleCopy} disabled={!outputText}>
+          {#if convertCompleted && outputText}
+            <button class="btn btn-secondary" onclick={handleSaveDraft} disabled={!inputText}>
+              💾 Save Draft
+            </button>
+          {/if}
+          <button class="btn btn-primary" onclick={handleCopy} disabled={!outputText}>
             📋 Copy
-          </button>
-          <button class="btn btn-secondary" onclick={handleSaveDraft} disabled={!outputText || !inputText}>
-            💾 Save Draft
           </button>
         </div>
       </div>
