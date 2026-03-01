@@ -173,10 +173,11 @@
 
   async function handleSaveDraft() {
     if (!inputText.trim() || !outputText.trim()) return;
+    const pool = sortedPersonas.length > 0 ? sortedPersonas : PERSONAS;
     const resolvedId =
       lastUsedPersonaId ??
       (selectedPersonaId === RANDOM_PERSONA_ID
-        ? (sortedPersonas.length > 0 ? sortedPersonas : PERSONAS)[Math.floor(Math.random() * (sortedPersonas.length > 0 ? sortedPersonas : PERSONAS).length)].id
+        ? pool[Math.floor(Math.random() * pool.length)].id
         : selectedPersonaId);
     const persona = findPersona(resolvedId)!;
     await saveDraft({
@@ -580,7 +581,7 @@
 
           <div class="persona-breakdown">
             <h3 class="timeline-title">Persona Usage</h3>
-            {#each [...PERSONAS, ...customPersonas] as persona (persona.id)}
+            {#each activePersonas as persona (persona.id)}
               {@const count = usageStats.reduce((sum, s) => sum + (s.personaUsage[persona.id] ?? 0), 0)}
               {#if count > 0}
                 <div class="persona-stat-row">
@@ -1272,5 +1273,10 @@
   .create-form-actions {
     display: flex;
     gap: 6px;
+  }
+
+  .stats-actions {
+    display: flex;
+    justify-content: flex-end;
   }
 </style>
