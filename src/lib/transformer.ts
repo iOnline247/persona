@@ -50,7 +50,7 @@ export async function rewriteText(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = await generatorInstance!(messages, {
-    max_new_tokens: Math.min(text.length * 2 + 100, 1000),
+    max_new_tokens: Math.min(Math.max(text.length * 2, 200) + 100, 1000),
     temperature: 0.7,
     do_sample: true,
     return_full_text: false,

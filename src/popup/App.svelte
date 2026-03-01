@@ -42,6 +42,9 @@
     selectedPersonaId === 'random' ? null : getPersonaById(selectedPersonaId)
   );
 
+  // Track the last persona actually used for a conversion so draft saves are consistent
+  let lastUsedPersonaId = $state<string | null>(null);
+
   let totalTransforms = $derived(usageStats.reduce((sum, s) => sum + s.count, 0));
   let totalChars = $derived(usageStats.reduce((sum, s) => sum + s.charactersProcessed, 0));
 
@@ -101,6 +104,7 @@
     try {
       const persona =
         selectedPersonaId === RANDOM_PERSONA_ID ? getRandomPersona() : getPersonaById(selectedPersonaId)!;
+      lastUsedPersonaId = persona.id;
       outputText = await rewriteText(inputText, persona.systemPrompt);
       await recordUsage(persona.id, inputText.length);
       const data = await getStorage();
@@ -120,8 +124,9 @@
 
   async function handleSaveDraft() {
     if (!inputText.trim() || !outputText.trim()) return;
-    const persona =
-      selectedPersonaId === RANDOM_PERSONA_ID ? getRandomPersona() : getPersonaById(selectedPersonaId)!;
+    // Use the persona that was actually used for conversion (consistent with output)
+    const resolvedId = lastUsedPersonaId ?? (selectedPersonaId === RANDOM_PERSONA_ID ? getRandomPersona().id : selectedPersonaId);
+    const persona = getPersonaById(resolvedId)!;
     await saveDraft({
       title: inputText.slice(0, 50) + (inputText.length > 50 ? '...' : ''),
       originalText: inputText,

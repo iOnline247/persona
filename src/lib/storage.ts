@@ -1,5 +1,8 @@
 import type { StorageData, Draft, WebsitePersona, UsageStat } from '../types/index.js';
 
+const MAX_DRAFTS = 50;
+const USAGE_STATS_RETENTION_DAYS = 30;
+
 const DEFAULT_STORAGE: StorageData = {
   websitePersonas: [],
   drafts: [],
@@ -51,7 +54,7 @@ export async function saveDraft(draft: Omit<Draft, 'id' | 'timestamp'>): Promise
     id: crypto.randomUUID(),
     timestamp: Date.now(),
   };
-  data.drafts = [newDraft, ...data.drafts].slice(0, 50);
+  data.drafts = [newDraft, ...data.drafts].slice(0, MAX_DRAFTS);
   await setStorage({ drafts: data.drafts });
   return newDraft;
 }
@@ -78,6 +81,6 @@ export async function recordUsage(personaId: string, charactersProcessed: number
       personaUsage: { [personaId]: 1 },
     });
   }
-  data.usageStats = data.usageStats.slice(-30);
+  data.usageStats = data.usageStats.slice(-USAGE_STATS_RETENTION_DAYS);
   await setStorage({ usageStats: data.usageStats });
 }
