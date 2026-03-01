@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "./.github/hooks/scripts/init.sh >> ./.accoutreai/logs/session.log",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}

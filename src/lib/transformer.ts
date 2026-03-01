@@ -1,4 +1,6 @@
 import { pipeline, env, type TextGenerationPipeline } from '@huggingface/transformers';
+import { redactSensitive } from './redaction.js';
+import { assessRisk } from './risk.js';
 
 // Configure transformers.js to use browser cache
 env.allowLocalModels = false;
@@ -46,7 +48,34 @@ export async function loadModel(onProgress?: ProgressCallback): Promise<void> {
   generatorInstance = await loadingPromise;
 }
 
-export async function rewriteText(
+import type { RiskSignal } from './risk.js';
+
+export interface RewriteResult {
+  output: string;
+  rounds: number;
+  divergence: number;
+  riskScore: number;
+  confidence: number;
+  signals: RiskSignal[];
+}
+
+// Character bigram Jaccard divergence (0 = identical, 1 = completely different)
+function charBigramDivergence(a: string, b: string): number {
+  const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+  const bigrams = (s: string): Set<string> => {
+    const set = new Set<string>();
+    for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2));
+    return set;
+  };
+  const ba = bigrams(normalize(a));
+  const bb = bigrams(normalize(b));
+  let intersection = 0;
+  for (const bg of ba) { if (bb.has(bg)) intersection++; }
+  const union = ba.size + bb.size - intersection;
+  return union === 0 ? 0 : 1 - intersection / union;
+}
+
+async function _doRewrite(
   text: string,
   systemPrompt: string,
   onProgress?: ProgressCallback
@@ -63,8 +92,6 @@ export async function rewriteText(
     },
   ];
 
-  // Build the prompt string via the tokenizer's chat template, matching the
-  // pattern recommended for Transformers.js 3.x instruction-tuned models.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const prompt: string = generatorInstance!.tokenizer.apply_chat_template(messages, {
     add_generation_prompt: true,
@@ -85,6 +112,50 @@ export async function rewriteText(
   });
 
   return String(result[0].generated_text).trim();
+}
+
+const TARGET_DIVERGENCE = 0.70;
+const MAX_ROUNDS = 3;
+
+export async function rewriteText(
+  text: string,
+  systemPrompt: string,
+  onProgress?: ProgressCallback
+): Promise<RewriteResult> {
+  // 1. Redact direct identifiers before sending to the model
+  const { redactedText } = redactSensitive(text);
+
+  let current = redactedText;
+  let rounds = 0;
+  let divergence = 0;
+
+  for (let round = 1; round <= MAX_ROUNDS; round++) {
+    rounds = round;
+    // On retry rounds, push the model harder to diverge
+    const prompt =
+      round === 1
+        ? systemPrompt
+        : systemPrompt +
+          '\n\nIMPORTANT: Your previous rewrite was too similar to the source text. ' +
+          'You MUST restructure every sentence, swap out synonyms aggressively, ' +
+          'and use completely different phrasing throughout. Do not preserve original wording.';
+
+    current = await _doRewrite(current, prompt, onProgress);
+    divergence = charBigramDivergence(redactedText, current);
+    if (divergence >= TARGET_DIVERGENCE) break;
+  }
+
+  // 2. Assess residual risk on the output
+  const risk = assessRisk(current);
+
+  return {
+    output: current,
+    rounds,
+    divergence,
+    riskScore: risk.score,
+    confidence: risk.confidence,
+    signals: risk.signals,
+  };
 }
 
 export function isModelLoaded(): boolean {
