@@ -9,6 +9,7 @@
     saveDraft,
     deleteDraft,
     recordUsage,
+    resetUsageStats,
     saveCustomPersona,
     deleteDefaultPersona,
     deleteCustomPersona,
@@ -271,6 +272,12 @@
     if (!PERSONAS.some((p) => p.id === selectedPersonaId)) {
       await handleSelectPersona('random');
     }
+  }
+
+  async function handleResetStats() {
+    if (!confirm('Reset all usage stats? This cannot be undone.')) return;
+    await resetUsageStats();
+    usageStats = [];
   }
 
   function formatDate(dateStr: string): string {
@@ -544,6 +551,12 @@
           </div>
         </div>
 
+        {#if usageStats.length > 0}
+          <div class="stats-actions">
+            <button class="btn btn-small btn-danger" onclick={handleResetStats}>Reset Stats</button>
+          </div>
+        {/if}
+
         {#if usageStats.length === 0}
           <div class="empty-state">
             <span>📊</span>
@@ -552,7 +565,7 @@
           </div>
         {:else}
           <div class="stats-timeline">
-            <h3 class="timeline-title">Recent Activity (last 30 days)</h3>
+            <h3 class="timeline-title">Recent Activity</h3>
             {#each [...usageStats].reverse() as stat (stat.date)}
               <div class="stat-row">
                 <span class="stat-date">{formatDate(stat.date)}</span>

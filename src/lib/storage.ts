@@ -1,7 +1,6 @@
 import type { StorageData, Draft, WebsitePersona, UsageStat, Persona } from '../types/index.js';
 
 const MAX_DRAFTS = 50;
-const USAGE_STATS_RETENTION_DAYS = 30;
 
 const DEFAULT_STORAGE: StorageData = {
   websitePersonas: [],
@@ -83,8 +82,11 @@ export async function recordUsage(personaId: string, charactersProcessed: number
       personaUsage: { [personaId]: 1 },
     });
   }
-  data.usageStats = data.usageStats.slice(-USAGE_STATS_RETENTION_DAYS);
   await setStorage({ usageStats: data.usageStats });
+}
+
+export async function resetUsageStats(): Promise<void> {
+  await setStorage({ usageStats: [] });
 }
 
 export async function saveCustomPersona(persona: Persona): Promise<void> {
