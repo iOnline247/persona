@@ -47,6 +47,7 @@
 
   let totalTransforms = $derived(usageStats.reduce((sum, s) => sum + s.count, 0));
   let totalChars = $derived(usageStats.reduce((sum, s) => sum + s.charactersProcessed, 0));
+  let maxStatCount = $derived(usageStats.length > 0 ? Math.max(...usageStats.map((s) => s.count)) : 1);
 
   onMount(async () => {
     const data = await getStorage();
@@ -419,7 +420,7 @@
               <div class="stat-row">
                 <span class="stat-date">{formatDate(stat.date)}</span>
                 <div class="stat-bar-container">
-                  <div class="stat-bar" style="width: {Math.min(100, (stat.count / Math.max(...usageStats.map(s => s.count))) * 100)}%"></div>
+                  <div class="stat-bar" style="width: {Math.min(100, (stat.count / maxStatCount) * 100)}%"></div>
                 </div>
                 <span class="stat-count">{stat.count}x</span>
                 <span class="stat-top-persona">{getTopPersonaForStat(stat)}</span>
@@ -435,7 +436,7 @@
                 <div class="persona-stat-row">
                   <span class="persona-stat-name">{persona.icon} {persona.name}</span>
                   <div class="stat-bar-container">
-                    <div class="stat-bar persona-bar" style="width: {Math.min(100, (count / totalTransforms) * 100)}%"></div>
+                    <div class="stat-bar persona-bar" style="width: {totalTransforms > 0 ? Math.min(100, (count / totalTransforms) * 100) : 0}%"></div>
                   </div>
                   <span class="stat-count">{count}x</span>
                 </div>
