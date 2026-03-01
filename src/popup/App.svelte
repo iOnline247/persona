@@ -6,8 +6,9 @@
     setStorage,
     setWebsitePersona,
     removeWebsitePersona,
-    saveDraft,
+    saveDraftMinimized,
     deleteDraft,
+    purgeExpiredDrafts,
     recordUsage,
     resetUsageStats,
     saveCustomPersona,
@@ -18,6 +19,7 @@
   import { loadModel, rewriteText, isModelLoaded } from '../lib/transformer.js';
   import type { Draft, UsageStat, WebsitePersona, Persona } from '../types/index.js';
   import type { RiskSignal } from '../lib/risk.js';
+  import { shouldAbstain } from '../lib/risk.js';
 
   type Tab = 'transform' | 'drafts' | 'websites' | 'stats';
 
@@ -38,6 +40,7 @@
   let lastDivergence = $state(0);
   let lastRounds = $state(0);
   let lastSignals = $state<RiskSignal[]>([]);
+  let abstainReason = $state<string | null>(null);
 
   let riskLevel = $derived(
     lastRisk >= 0.75 ? 'critical' :
@@ -115,6 +118,9 @@
     customPersonas = data.customPersonas ?? [];
     deletedDefaultPersonaIds = data.deletedDefaultPersonaIds ?? [];
 
+    // Purge drafts older than retention TTL on startup
+    drafts = await purgeExpiredDrafts();
+
     chrome.runtime.sendMessage({ type: 'GET_CURRENT_TAB_HOSTNAME' }, (response) => {
       if (response?.hostname) {
         currentHostname = response.hostname;
@@ -166,6 +172,7 @@
     lastDivergence = 0;
     lastRounds = 0;
     lastSignals = [];
+    abstainReason = null;
     convertCompleted = false;
     try {
       const pool = sortedPersonas.length > 0 ? sortedPersonas : PERSONAS;
@@ -175,13 +182,21 @@
           : findPersona(selectedPersonaId)!;
       lastUsedPersonaId = persona.id;
       const result = await rewriteText(inputText, persona.systemPrompt);
-      outputText = result.output;
       lastRisk = result.riskScore;
       lastConfidence = result.confidence;
       lastDivergence = result.divergence;
       lastRounds = result.rounds;
       lastSignals = result.signals;
-      convertCompleted = true;
+
+      const decision = shouldAbstain(lastRisk, lastConfidence);
+      if (decision.abstain) {
+        outputText = '';
+        abstainReason = decision.reason!;
+      } else {
+        outputText = result.output;
+        convertCompleted = true;
+      }
+
       await recordUsage(persona.id, inputText.length);
       const data = await getStorage();
       usageStats = data.usageStats;
@@ -207,9 +222,8 @@
         ? pool[Math.floor(Math.random() * pool.length)].id
         : selectedPersonaId);
     const persona = findPersona(resolvedId)!;
-    await saveDraft({
+    await saveDraftMinimized({
       title: inputText.slice(0, 50) + (inputText.length > 50 ? '...' : ''),
-      originalText: inputText,
       rewrittenText: outputText,
       personaId: persona.id,
       personaName: persona.name,
@@ -241,6 +255,7 @@
     outputText = draft.rewrittenText;
     // Reset quality card — metrics for this draft are unknown
     convertCompleted = false;
+    abstainReason = null;
     lastRisk = 0;
     lastConfidence = 0;
     lastDivergence = 0;
@@ -524,6 +539,17 @@
             {:else}
               <p class="no-signals">No risk signals detected in output</p>
             {/if}
+          </div>
+        {/if}
+
+        <!-- Abstain warning – shown instead of quality card when risk is too high -->
+        {#if abstainReason}
+          <div class="abstain-warning">
+            <span class="abstain-icon">⚠️</span>
+            <div>
+              <strong>{abstainReason}.</strong>
+              Please remove more personal details and retry.
+            </div>
           </div>
         {/if}
 
@@ -1074,6 +1100,21 @@
     font-size: 10px;
     color: #374151;
   }
+
+  .abstain-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: #2d0808;
+    border: 1px solid #7f1d1d;
+    border-left: 3px solid #dc2626;
+    border-radius: 10px;
+    padding: 10px 13px;
+    font-size: 12px;
+    color: #fca5a5;
+    line-height: 1.5;
+  }
+  .abstain-icon { font-size: 14px; flex-shrink: 0; line-height: 1.4; }
 
   /* ─── Output actions ─────────────────────────────────────────────────────── */
   .output-actions { display: flex; gap: 8px; }

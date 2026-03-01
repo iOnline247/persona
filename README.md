@@ -45,9 +45,12 @@ Use it as a privacy-assistance layer, not as a sole protection mechanism for hig
 │   ├── background
 │   │   └── service-worker.ts     # MV3 background worker
 │   ├── lib
+│   │   ├── evaluator.ts          # Offline eval harness and calibration metrics
 │   │   ├── personas.ts           # Persona definitions and prompts
+│   │   ├── redaction.ts          # PII redaction pass (pre-model)
+│   │   ├── risk.ts               # Multi-tier risk assessment and abstain logic
 │   │   ├── storage.ts            # chrome.storage.local helpers
-│   │   └── transformer.ts        # Model load + rewrite pipeline
+│   │   └── transformer.ts        # Model load + iterative rewrite pipeline
 │   ├── popup
 │   │   ├── App.svelte            # Main popup UI
 │   │   └── main.ts               # Popup entrypoint
@@ -56,6 +59,12 @@ Use it as a privacy-assistance layer, not as a sole protection mechanism for hig
 ├── public
 │   ├── manifest.json             # Extension manifest
 │   └── icons
+├── examples
+│   └── eval-fixtures.json        # Eval input/output fixtures
+├── scripts
+│   └── eval.ts                   # Offline evaluation script
+├── specs
+│   └── gap-analysis.md           # Feature gap analysis and directives
 ├── package.json
 └── vite.config.ts
 ```
@@ -148,7 +157,7 @@ From `public/manifest.json`:
 
 ## Limitations
 
-- No formal deanonymization-risk score or confidence calibration yet
+- Risk scoring is heuristic; no calibration against ground-truth deanonymization outcomes yet
 - No guarantee against semantic-linking attacks
 - Rewrites are quality-dependent on local model behavior and browser runtime support
 - First model load can be slow (download + initialization)

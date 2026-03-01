@@ -106,9 +106,10 @@ export interface GroupSummary {
 }
 
 export function summarizeByGroup(results: EvalResult[], cases: EvalCase[]): GroupSummary[] {
+  const caseMap = new Map(cases.map((c) => [c.id, c]));
   const groups = new Map<string, EvalResult[]>();
   for (const r of results) {
-    const c = cases.find((c) => c.id === r.id)!;
+    const c = caseMap.get(r.id)!;
     const key = groupKey(c);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(r);
@@ -157,7 +158,7 @@ export function calibrationTable(
     if (slice.length === 0) continue;
     const predicted = slice.reduce((s, r) => s + r.riskScore, 0) / slice.length;
     const observed = slice.filter((r) => r.leaked).length / slice.length;
-    out.push({ bin: `[${lo},${hi})`, predicted, observed, count: slice.length });
+    out.push({ bin: `[${lo},${hi}${isLastBin ? ']' : ')'}`, predicted, observed, count: slice.length });
   }
   return out;
 }
