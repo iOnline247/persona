@@ -1,4 +1,4 @@
-import type { StorageData, Draft, WebsitePersona, UsageStat } from '../types/index.js';
+import type { StorageData, Draft, WebsitePersona, UsageStat, Persona } from '../types/index.js';
 
 const MAX_DRAFTS = 50;
 const USAGE_STATS_RETENTION_DAYS = 30;
@@ -8,6 +8,8 @@ const DEFAULT_STORAGE: StorageData = {
   drafts: [],
   usageStats: [],
   selectedPersonaId: 'random',
+  customPersonas: [],
+  deletedDefaultPersonaIds: [],
 };
 
 export async function getStorage(): Promise<StorageData> {
@@ -83,4 +85,33 @@ export async function recordUsage(personaId: string, charactersProcessed: number
   }
   data.usageStats = data.usageStats.slice(-USAGE_STATS_RETENTION_DAYS);
   await setStorage({ usageStats: data.usageStats });
+}
+
+export async function saveCustomPersona(persona: Persona): Promise<void> {
+  const data = await getStorage();
+  const existing = data.customPersonas.findIndex((p) => p.id === persona.id);
+  if (existing >= 0) {
+    data.customPersonas[existing] = persona;
+  } else {
+    data.customPersonas.push(persona);
+  }
+  await setStorage({ customPersonas: data.customPersonas });
+}
+
+export async function deleteDefaultPersona(id: string): Promise<void> {
+  const data = await getStorage();
+  if (!data.deletedDefaultPersonaIds.includes(id)) {
+    data.deletedDefaultPersonaIds.push(id);
+  }
+  await setStorage({ deletedDefaultPersonaIds: data.deletedDefaultPersonaIds });
+}
+
+export async function deleteCustomPersona(id: string): Promise<void> {
+  const data = await getStorage();
+  data.customPersonas = data.customPersonas.filter((p) => p.id !== id);
+  await setStorage({ customPersonas: data.customPersonas });
+}
+
+export async function restoreDefaults(): Promise<void> {
+  await setStorage({ deletedDefaultPersonaIds: [], customPersonas: [] });
 }
