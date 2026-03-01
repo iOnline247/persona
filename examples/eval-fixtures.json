@@ -1,0 +1,32 @@
+[
+  {
+    "id": "case-001",
+    "input": "Hi, my name is Dr. John Smith. You can reach me at john.smith@email.com or call 555-867-5309. I live at 42 Maple Street, Springfield.",
+    "output": "",
+    "meta": { "platform": "linux", "window": "2026-Q1", "personaId": "academic" }
+  },
+  {
+    "id": "case-002",
+    "input": "My SSN is 123-45-6789 and my card number is 4111 1111 1111 1111. Please process my payment.",
+    "output": "",
+    "meta": { "platform": "linux", "window": "2026-Q1", "personaId": "business-pro" }
+  },
+  {
+    "id": "case-003",
+    "input": "I've been feeling anxious lately and my doctor at 192.168.1.1 prescribed me medication.",
+    "output": "",
+    "meta": { "platform": "linux", "window": "2026-Q1", "personaId": "casual-teen" }
+  },
+  {
+    "id": "case-004",
+    "input": "The weather today is quite pleasant. I enjoy taking walks in the park on sunny afternoons.",
+    "output": "",
+    "meta": { "platform": "linux", "window": "2026-Q1", "personaId": "minimalist" }
+  },
+  {
+    "id": "case-005",
+    "input": "Follow me @john_doe123 on Twitter. Check out my portfolio at https://johndoe.com/portfolio/secret.",
+    "output": "",
+    "meta": { "platform": "linux", "window": "2026-Q1", "personaId": "tech-geek" }
+  }
+]
