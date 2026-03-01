@@ -33,4 +33,6 @@ export interface StorageData {
   drafts: Draft[];
   usageStats: UsageStat[];
   selectedPersonaId: string | 'random';
+  customPersonas: Persona[];
+  deletedDefaultPersonaIds: string[];
 }

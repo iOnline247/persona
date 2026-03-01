@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { PERSONAS, RANDOM_PERSONA_ID, getPersonaById, getRandomPersona } from '../lib/personas.js';
+  import { PERSONAS, RANDOM_PERSONA_ID } from '../lib/personas.js';
   import {
     getStorage,
     setStorage,
@@ -9,9 +9,13 @@
     saveDraft,
     deleteDraft,
     recordUsage,
+    saveCustomPersona,
+    deleteDefaultPersona,
+    deleteCustomPersona,
+    restoreDefaults,
   } from '../lib/storage.js';
   import { loadModel, rewriteText, isModelLoaded } from '../lib/transformer.js';
-  import type { Draft, UsageStat, WebsitePersona } from '../types/index.js';
+  import type { Draft, UsageStat, WebsitePersona, Persona } from '../types/index.js';
 
   type Tab = 'transform' | 'drafts' | 'websites' | 'stats';
 
@@ -31,6 +35,16 @@
   let newWebsitePersona = $state('random');
   let usageStats = $state<UsageStat[]>([]);
 
+  let customPersonas = $state<Persona[]>([]);
+  let deletedDefaultPersonaIds = $state<string[]>([]);
+
+  // Create-persona form state
+  let showCreateForm = $state(false);
+  let newPersonaName = $state('');
+  let newPersonaIcon = $state('🤖');
+  let newPersonaDesc = $state('');
+  let newPersonaPrompt = $state('');
+
   let inputWordCount = $derived(
     inputText.trim() === '' ? 0 : inputText.trim().split(/\s+/).length
   );
@@ -38,8 +52,35 @@
     outputText.trim() === '' ? 0 : outputText.trim().split(/\s+/).length
   );
 
+  // Active personas = defaults minus deleted + custom
+  let activePersonas = $derived([
+    ...PERSONAS.filter((p) => !deletedDefaultPersonaIds.includes(p.id)),
+    ...customPersonas,
+  ]);
+
+  // Total usage count per persona across all usage stats (active personas only)
+  let personaUsageCounts = $derived(
+    Object.fromEntries(
+      activePersonas.map((p) => [
+        p.id,
+        usageStats.reduce((sum, s) => sum + (s.personaUsage[p.id] ?? 0), 0),
+      ])
+    ) as Record<string, number>
+  );
+
+  // Personas sorted by usage count descending
+  let sortedPersonas = $derived(
+    [...activePersonas].sort(
+      (a, b) => (personaUsageCounts[b.id] ?? 0) - (personaUsageCounts[a.id] ?? 0)
+    )
+  );
+
+  function findPersona(id: string): Persona | undefined {
+    return activePersonas.find((p) => p.id === id) ?? PERSONAS.find((p) => p.id === id);
+  }
+
   let activePersona = $derived(
-    selectedPersonaId === 'random' ? null : getPersonaById(selectedPersonaId)
+    selectedPersonaId === 'random' ? null : findPersona(selectedPersonaId)
   );
 
   // Track the last persona actually used for a conversion so draft saves are consistent
@@ -55,6 +96,8 @@
     drafts = data.drafts;
     websitePersonas = data.websitePersonas;
     usageStats = data.usageStats;
+    customPersonas = data.customPersonas ?? [];
+    deletedDefaultPersonaIds = data.deletedDefaultPersonaIds ?? [];
 
     chrome.runtime.sendMessage({ type: 'GET_CURRENT_TAB_HOSTNAME' }, (response) => {
       if (response?.hostname) {
@@ -102,8 +145,11 @@
 
     isConverting = true;
     try {
+      const pool = sortedPersonas.length > 0 ? sortedPersonas : PERSONAS;
       const persona =
-        selectedPersonaId === RANDOM_PERSONA_ID ? getRandomPersona() : getPersonaById(selectedPersonaId)!;
+        selectedPersonaId === RANDOM_PERSONA_ID
+          ? pool[Math.floor(Math.random() * pool.length)]
+          : findPersona(selectedPersonaId)!;
       lastUsedPersonaId = persona.id;
       outputText = await rewriteText(inputText, persona.systemPrompt);
       await recordUsage(persona.id, inputText.length);
@@ -124,9 +170,12 @@
 
   async function handleSaveDraft() {
     if (!inputText.trim() || !outputText.trim()) return;
-    // Use the persona that was actually used for conversion (consistent with output)
-    const resolvedId = lastUsedPersonaId ?? (selectedPersonaId === RANDOM_PERSONA_ID ? getRandomPersona().id : selectedPersonaId);
-    const persona = getPersonaById(resolvedId)!;
+    const resolvedId =
+      lastUsedPersonaId ??
+      (selectedPersonaId === RANDOM_PERSONA_ID
+        ? (sortedPersonas.length > 0 ? sortedPersonas : PERSONAS)[Math.floor(Math.random() * (sortedPersonas.length > 0 ? sortedPersonas : PERSONAS).length)].id
+        : selectedPersonaId);
+    const persona = findPersona(resolvedId)!;
     await saveDraft({
       title: inputText.slice(0, 50) + (inputText.length > 50 ? '...' : ''),
       originalText: inputText,
@@ -176,6 +225,50 @@
     websitePersonas = data.websitePersonas;
   }
 
+  async function handleCreatePersona() {
+    if (!newPersonaName.trim() || !newPersonaPrompt.trim()) return;
+    const persona: Persona = {
+      id: `custom-${crypto.randomUUID()}`,
+      name: newPersonaName.trim(),
+      icon: newPersonaIcon.trim() || '🤖',
+      description: newPersonaDesc.trim(),
+      systemPrompt: newPersonaPrompt.trim(),
+    };
+    await saveCustomPersona(persona);
+    const data = await getStorage();
+    customPersonas = data.customPersonas;
+    newPersonaName = '';
+    newPersonaIcon = '🤖';
+    newPersonaDesc = '';
+    newPersonaPrompt = '';
+    showCreateForm = false;
+  }
+
+  async function handleDeletePersona(id: string) {
+    const isDefault = PERSONAS.some((p) => p.id === id);
+    if (isDefault) {
+      await deleteDefaultPersona(id);
+      const data = await getStorage();
+      deletedDefaultPersonaIds = data.deletedDefaultPersonaIds;
+    } else {
+      await deleteCustomPersona(id);
+      const data = await getStorage();
+      customPersonas = data.customPersonas;
+    }
+    if (selectedPersonaId === id) {
+      await handleSelectPersona('random');
+    }
+  }
+
+  async function handleRestoreDefaults() {
+    await restoreDefaults();
+    deletedDefaultPersonaIds = [];
+    customPersonas = [];
+    if (!PERSONAS.some((p) => p.id === selectedPersonaId)) {
+      await handleSelectPersona('random');
+    }
+  }
+
   function formatDate(dateStr: string): string {
     const [year, month, day] = dateStr.split('-');
     return new Date(Number(year), Number(month) - 1, Number(day)).toLocaleDateString(undefined, {
@@ -188,7 +281,7 @@
     const entries = Object.entries(stat.personaUsage);
     if (entries.length === 0) return 'None';
     const top = entries.sort((a, b) => b[1] - a[1])[0];
-    return getPersonaById(top[0])?.name ?? top[0];
+    return findPersona(top[0])?.name ?? top[0];
   }
 </script>
 
@@ -219,7 +312,17 @@
   </header>
 
   <div class="persona-bar">
-    <span class="persona-label">Persona:</span>
+    <div class="persona-bar-header">
+      <span class="persona-label">Persona:</span>
+      <div class="persona-bar-actions">
+        <button class="pill pill-create" onclick={() => (showCreateForm = !showCreateForm)} title="Create custom persona">
+          + Create
+        </button>
+        <button class="pill pill-restore" onclick={handleRestoreDefaults} title="Restore default personas">
+          ↺ Restore Defaults
+        </button>
+      </div>
+    </div>
     <div class="persona-pills">
       <button
         class="pill"
@@ -228,17 +331,46 @@
       >
         🎲 Random
       </button>
-      {#each PERSONAS as persona (persona.id)}
-        <button
-          class="pill"
-          class:active={selectedPersonaId === persona.id}
-          onclick={() => handleSelectPersona(persona.id)}
-          title={persona.description}
-        >
-          {persona.icon} {persona.name}
-        </button>
+      {#each sortedPersonas as persona (persona.id)}
+        {@const count = personaUsageCounts[persona.id] ?? 0}
+        <div class="pill-group">
+          <button
+            class="pill pill-main"
+            class:active={selectedPersonaId === persona.id}
+            onclick={() => handleSelectPersona(persona.id)}
+            title={persona.description}
+          >
+            {persona.icon} {persona.name}{#if count > 0} <span class="pill-count">({count})</span>{/if}
+          </button>
+          <button
+            class="pill pill-del"
+            class:active={selectedPersonaId === persona.id}
+            onclick={() => handleDeletePersona(persona.id)}
+            title="Delete persona"
+          >×</button>
+        </div>
       {/each}
     </div>
+
+    {#if showCreateForm}
+      <div class="create-form">
+        <div class="create-form-title">New Persona</div>
+        <div class="create-form-row">
+          <input class="input create-icon-input" bind:value={newPersonaIcon} placeholder="🤖" maxlength="4" aria-label="Persona icon (emoji)" />
+          <input class="input" style="flex:1" bind:value={newPersonaName} placeholder="Name" aria-label="Persona name" />
+        </div>
+        <input class="input" bind:value={newPersonaDesc} placeholder="Short description" aria-label="Persona description" />
+        <textarea class="text-area create-prompt" bind:value={newPersonaPrompt} placeholder="System prompt — describe how this persona writes..." aria-label="System prompt"></textarea>
+        <div class="create-form-actions">
+          <button class="btn btn-primary btn-small" onclick={handleCreatePersona} disabled={!newPersonaName.trim() || !newPersonaPrompt.trim()}>
+            ✓ Save
+          </button>
+          <button class="btn btn-secondary btn-small" onclick={() => (showCreateForm = false)}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    {/if}
   </div>
 
   <nav class="tabs">
@@ -330,7 +462,7 @@
                 <div class="draft-header">
                   <span class="draft-title">{draft.title}</span>
                   <span class="draft-meta">
-                    {getPersonaById(draft.personaId)?.icon ?? '🎭'} {draft.personaName} · {new Date(draft.timestamp).toLocaleDateString()}
+                    {findPersona(draft.personaId)?.icon ?? '🎭'} {draft.personaName} · {new Date(draft.timestamp).toLocaleDateString()}
                   </span>
                 </div>
                 <div class="draft-preview">{draft.rewrittenText.slice(0, 100)}...</div>
@@ -361,7 +493,7 @@
           />
           <select bind:value={newWebsitePersona} class="select">
             <option value="random">🎲 Random</option>
-            {#each PERSONAS as persona (persona.id)}
+            {#each sortedPersonas as persona (persona.id)}
               <option value={persona.id}>{persona.icon} {persona.name}</option>
             {/each}
           </select>
@@ -380,7 +512,7 @@
               <div class="website-row">
                 <span class="site-name">{wp.hostname}</span>
                 <span class="site-persona">
-                  {wp.personaId === 'random' ? '🎲 Random' : (getPersonaById(wp.personaId)?.icon ?? '') + ' ' + (getPersonaById(wp.personaId)?.name ?? wp.personaId)}
+                  {wp.personaId === 'random' ? '🎲 Random' : (findPersona(wp.personaId)?.icon ?? '') + ' ' + (findPersona(wp.personaId)?.name ?? wp.personaId)}
                 </span>
                 <button class="btn btn-small btn-danger" onclick={() => handleRemoveWebsite(wp.hostname)}>✕</button>
               </div>
@@ -429,7 +561,7 @@
 
           <div class="persona-breakdown">
             <h3 class="timeline-title">Persona Usage</h3>
-            {#each PERSONAS as persona (persona.id)}
+            {#each [...PERSONAS, ...customPersonas] as persona (persona.id)}
               {@const count = usageStats.reduce((sum, s) => sum + (s.personaUsage[persona.id] ?? 0), 0)}
               {#if count > 0}
                 <div class="persona-stat-row">
@@ -1001,5 +1133,125 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .persona-bar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .persona-bar-actions {
+    display: flex;
+    gap: 4px;
+  }
+
+  .pill-create {
+    background: #1f2937;
+    border-color: #7c3aed;
+    color: #a78bfa;
+  }
+
+  .pill-create:hover {
+    background: #2d1f47;
+    color: #c4b5fd;
+  }
+
+  .pill-restore {
+    background: #1f2937;
+    border-color: #374151;
+    color: #6b7280;
+  }
+
+  .pill-restore:hover {
+    background: #374151;
+    color: #9ca3af;
+  }
+
+  .pill-group {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .pill-main {
+    border-radius: 20px 0 0 20px;
+    border-right: none;
+  }
+
+  .pill-del {
+    background: #1f2937;
+    border: 1px solid #374151;
+    color: #6b7280;
+    padding: 4px 7px;
+    border-radius: 0 20px 20px 0;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1;
+  }
+
+  .pill-del:hover {
+    background: #7f1d1d;
+    border-color: #991b1b;
+    color: #fca5a5;
+  }
+
+  .pill-del.active {
+    background: #5b21b6;
+    border-color: #5b21b6;
+  }
+
+  .pill-del.active:hover {
+    background: #7f1d1d;
+    border-color: #991b1b;
+  }
+
+  .pill-count {
+    font-size: 10px;
+    opacity: 0.75;
+  }
+
+  .create-form {
+    margin-top: 8px;
+    background: #1a1f2e;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .create-form-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #a78bfa;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .create-form-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .create-icon-input {
+    flex: 0 0 44px;
+    text-align: center;
+    font-size: 16px;
+    padding: 4px 6px;
+  }
+
+  .create-prompt {
+    min-height: 70px;
+    max-height: 120px;
+    font-size: 12px;
+  }
+
+  .create-form-actions {
+    display: flex;
+    gap: 6px;
   }
 </style>
