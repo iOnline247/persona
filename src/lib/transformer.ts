@@ -1,4 +1,4 @@
-import { pipeline, env } from '@huggingface/transformers';
+import { pipeline, env, type TextGenerationPipeline } from '@huggingface/transformers';
 
 // Configure transformers.js to use browser cache
 env.allowLocalModels = false;
@@ -16,22 +16,23 @@ env.useBrowserCache = true;
 };
 
 const MODEL_ID = 'HuggingFaceTB/SmolLM2-135M-Instruct';
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let generatorInstance: any | null = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let loadingPromise: Promise<any> | null = null;
+
+let generatorInstance: TextGenerationPipeline | null = null;
+let loadingPromise: Promise<TextGenerationPipeline> | null = null;
 
 export type ProgressCallback = (progress: { status: string; progress?: number; file?: string }) => void;
 
 export async function loadModel(onProgress?: ProgressCallback): Promise<void> {
-  if (generatorInstance) return;
+  if (generatorInstance) {
+    return;
+  }
+
   if (!loadingPromise) {
     loadingPromise = (pipeline('text-generation', MODEL_ID, {
       dtype: 'q4',
       device: 'webgpu',
       progress_callback: onProgress,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as Promise<any>).catch(() => {
+    }) as Promise<unknown> as Promise<TextGenerationPipeline>).catch(() => {
       // Fallback to WASM — explicitly set device:'wasm' so the non-JSEP
       // WASM backend is loaded instead of the WebGPU JSEP variant.
       return pipeline('text-generation', MODEL_ID, {
@@ -39,8 +40,9 @@ export async function loadModel(onProgress?: ProgressCallback): Promise<void> {
         device: 'wasm',
         progress_callback: onProgress,
       });
-    });
+    }) as Promise<unknown> as Promise<TextGenerationPipeline>;
   }
+
   generatorInstance = await loadingPromise;
 }
 
