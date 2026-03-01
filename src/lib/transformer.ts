@@ -4,10 +4,16 @@ import { pipeline, env } from '@huggingface/transformers';
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 
-// Force single-threaded WASM to avoid SharedArrayBuffer / cross-origin isolation
-// requirements that cause ort-wasm-simd-threaded.jsep to abort in extension contexts.
+// Point ORT to the locally bundled WASM/MJS files so Chrome MV3's
+// "script-src 'self'" CSP is satisfied (the default falls back to CDN).
+// The 'ort/' directory is created by the copy-ort-wasm plugin in vite.config.ts.
+// Also force single-threaded WASM to avoid SharedArrayBuffer requirements.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-(env.backends.onnx as any).wasm = { ...(env.backends.onnx as any).wasm, numThreads: 1 };
+(env.backends.onnx as any).wasm = {
+  ...(env.backends.onnx as any).wasm,
+  numThreads: 1,
+  wasmPaths: chrome.runtime.getURL('ort/'),
+};
 
 const MODEL_ID = 'HuggingFaceTB/SmolLM2-135M-Instruct';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
