@@ -98,7 +98,6 @@
     if (!inputText.trim() || isConverting) return;
     if (modelStatus !== 'ready') {
       await initModel();
-      if (modelStatus !== 'ready') return;
     }
 
     isConverting = true;
