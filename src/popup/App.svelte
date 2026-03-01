@@ -192,12 +192,14 @@
   async function handleSelectPersona(id: string) {
     selectedPersonaId = id;
     await setStorage({ selectedPersonaId: id });
-    if (currentHostname) {
-      await setWebsitePersona(currentHostname, id);
-      const data = await getStorage();
-      websitePersonas = data.websitePersonas;
-    }
   }
+
+  $effect(() => {
+    if (activeTab === 'websites') {
+      newWebsite = currentHostname ?? '';
+      newWebsitePersona = selectedPersonaId;
+    }
+  });
 
   async function handleDeleteDraft(id: string) {
     await deleteDraft(id);
