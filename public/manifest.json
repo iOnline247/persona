@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Persona - Writing Style Obfuscator",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Protect your identity by rewriting text with AI-powered personas to combat large-scale deanonymization attacks.",
   "permissions": [
     "storage",
