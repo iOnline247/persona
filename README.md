@@ -1,6 +1,6 @@
 # Persona
 
-Persona is a Chrome MV3 extension that rewrites text in different writing personas using a local in-browser model (`@huggingface/transformers`).
+Persona is a Chrome extension that rewrites text in different writing personas using a local in-browser model (`@huggingface/transformers`).  Nothing leaves your browser and is done locally on your own computer. No analytics, no API calls, just the LLM and your machine.
 
 The motivation is to make writing style less consistent across posts and contexts, reducing straightforward stylometric linkability.
 
@@ -15,7 +15,7 @@ Use it as a privacy-assistance layer, not as a sole protection mechanism for hig
 ## Current features
 
 - Local text rewriting with `HuggingFaceTB/SmolLM2-135M-Instruct`
-- Multiple personas + random persona mode
+- Multiple personas, random persona mode, or create your own
   - Academic Scholar
   - Casual Teen
   - Business Professional
@@ -27,7 +27,7 @@ Use it as a privacy-assistance layer, not as a sole protection mechanism for hig
 - Model download/cache progress in popup UI
 - Per-website persona mapping (auto-select by current hostname)
 - Draft save/load/delete
-- Usage stats (last 30 days): transforms, characters processed, persona usage
+- Usage stats: transforms, characters processed, persona usage
 - Copy rewritten output to clipboard
 
 ## Tech stack
@@ -62,7 +62,7 @@ Use it as a privacy-assistance layer, not as a sole protection mechanism for hig
 
 ## Developer Requirements
 
-- Node.js 18+
+- Node.js 24+
 - npm
 - Chrome/Chromium with extension developer mode available
 
