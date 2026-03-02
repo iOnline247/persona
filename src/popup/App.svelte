@@ -54,12 +54,46 @@
   let customPersonas = $state<Persona[]>([]);
   let deletedDefaultPersonaIds = $state<string[]>([]);
 
-  // Create-persona form state
+  // Create/edit persona form state
   let showCreateForm = $state(false);
+  let editingPersonaId = $state<string | null>(null);
   let newPersonaName = $state('');
   let newPersonaIcon = $state('🤖');
   let newPersonaDesc = $state('');
   let newPersonaPrompt = $state('');
+
+  // ── Toast / confirm system ────────────────────────────────────────────────
+  type ToastType = 'success' | 'error' | 'warn' | 'info';
+  interface ToastItem { id: string; type: ToastType; message: string; }
+  interface ConfirmState {
+    message: string;
+    detail?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    danger?: boolean;
+    onConfirm: () => void | Promise<void>;
+  }
+
+  let toasts = $state<ToastItem[]>([]);
+  let pendingConfirm = $state<ConfirmState | null>(null);
+
+  function showToast(message: string, type: ToastType = 'info', duration = 2600) {
+    const id = crypto.randomUUID();
+    toasts = [...toasts, { id, type, message }];
+    setTimeout(() => dismissToast(id), duration);
+  }
+
+  function dismissToast(id: string) {
+    toasts = toasts.filter((t) => t.id !== id);
+  }
+
+  function showConfirm(state: ConfirmState) {
+    pendingConfirm = state;
+  }
+
+  function dismissConfirm() {
+    pendingConfirm = null;
+  }
 
   let inputWordCount = $derived(
     inputText.trim() === '' ? 0 : inputText.trim().split(/\s+/).length
@@ -141,7 +175,8 @@
           ? `Loading ${progress.file}...`
           : progress.status;
         if (progress.progress !== undefined) {
-          modelProgress = Math.round(progress.progress * 100);
+          // progress.progress is already 0-100 in transformers.js v3; clamp defensively
+          modelProgress = Math.min(100, Math.round(progress.progress));
         }
       });
       modelStatus = 'ready';
@@ -196,6 +231,7 @@
   async function handleCopy() {
     if (!outputText) return;
     await navigator.clipboard.writeText(outputText);
+    showToast('Copied to clipboard', 'success');
   }
 
   async function handleSaveDraft() {
@@ -216,6 +252,7 @@
     });
     const data = await getStorage();
     drafts = data.drafts;
+    showToast('Draft saved', 'success');
   }
 
   async function handleSelectPersona(id: string) {
@@ -268,12 +305,13 @@
   async function handleCreatePersona() {
     if (!newPersonaName.trim() || !newPersonaPrompt.trim()) return;
     const persona: Persona = {
-      id: `custom-${crypto.randomUUID()}`,
+      id: editingPersonaId ?? `custom-${crypto.randomUUID()}`,
       name: newPersonaName.trim(),
       icon: newPersonaIcon.trim() || '🤖',
       description: newPersonaDesc.trim(),
       systemPrompt: newPersonaPrompt.trim(),
     };
+    const wasEditing = editingPersonaId !== null;
     await saveCustomPersona(persona);
     const data = await getStorage();
     customPersonas = data.customPersonas;
@@ -281,7 +319,9 @@
     newPersonaIcon = '🤖';
     newPersonaDesc = '';
     newPersonaPrompt = '';
+    editingPersonaId = null;
     showCreateForm = false;
+    showToast(wasEditing ? 'Persona updated' : 'Persona created', 'success');
   }
 
   async function handleDeletePersona(id: string) {
@@ -298,21 +338,62 @@
     if (selectedPersonaId === id) {
       await handleSelectPersona('random');
     }
-  }
-
-  async function handleRestoreDefaults() {
-    await restoreDefaults();
-    deletedDefaultPersonaIds = [];
-    customPersonas = [];
-    if (!PERSONAS.some((p) => p.id === selectedPersonaId)) {
-      await handleSelectPersona('random');
+    // If the deleted persona was being edited, cancel the form to avoid stale state
+    if (editingPersonaId === id) {
+      handleCancelCreateForm();
     }
   }
 
+  function handleStartEditPersona(persona: Persona) {
+    editingPersonaId = persona.id;
+    newPersonaName = persona.name;
+    newPersonaIcon = persona.icon;
+    newPersonaDesc = persona.description;
+    newPersonaPrompt = persona.systemPrompt;
+    showCreateForm = true;
+  }
+
+  function handleCancelCreateForm() {
+    editingPersonaId = null;
+    newPersonaName = '';
+    newPersonaIcon = '🤖';
+    newPersonaDesc = '';
+    newPersonaPrompt = '';
+    showCreateForm = false;
+  }
+
+  async function handleRestoreDefaults() {
+    showConfirm({
+      message: 'Restore default personas?',
+      detail: 'Custom personas will be removed and any deleted defaults will be restored.',
+      confirmLabel: 'Restore',
+      danger: true,
+      onConfirm: async () => {
+        await restoreDefaults();
+        deletedDefaultPersonaIds = [];
+        customPersonas = [];
+        // Clear any in-progress edit since custom personas are gone
+        handleCancelCreateForm();
+        if (!PERSONAS.some((p) => p.id === selectedPersonaId)) {
+          await handleSelectPersona('random');
+        }
+        showToast('Default personas restored', 'success');
+      },
+    });
+  }
+
   async function handleResetStats() {
-    if (!confirm('Reset all usage stats? This cannot be undone.')) return;
-    await resetUsageStats();
-    usageStats = [];
+    showConfirm({
+      message: 'Reset all usage stats?',
+      detail: 'This cannot be undone.',
+      confirmLabel: 'Reset',
+      danger: true,
+      onConfirm: async () => {
+        await resetUsageStats();
+        usageStats = [];
+        showToast('Stats reset', 'success');
+      },
+    });
   }
 
   function formatDate(dateStr: string): string {
@@ -370,10 +451,10 @@
     <div class="persona-bar-header">
       <span class="section-eyebrow">Persona</span>
       <div class="persona-bar-actions">
-        <button class="ghost-btn ghost-accent" onclick={() => (showCreateForm = !showCreateForm)}>
+        <button class="ghost-btn ghost-accent" onclick={() => { if (showCreateForm) handleCancelCreateForm(); else showCreateForm = true; }}>
           {showCreateForm ? '✕ Cancel' : '+ New'}
         </button>
-        <button class="ghost-btn" onclick={handleRestoreDefaults} title="Restore defaults">↺</button>
+        <button class="ghost-btn" onclick={handleRestoreDefaults} title="Restore default personas">↺ Restore</button>
       </div>
     </div>
     <div class="persona-pills">
@@ -382,6 +463,7 @@
       </button>
       {#each sortedPersonas as persona (persona.id)}
         {@const count = personaUsageCounts[persona.id] ?? 0}
+        {@const isCustom = !PERSONAS.some((p) => p.id === persona.id)}
         <div class="pill-group">
           <button
             class="pill pill-main"
@@ -391,6 +473,14 @@
           >
             {persona.icon} {persona.name}{#if count > 0}<span class="pill-count"> {count}</span>{/if}
           </button>
+          {#if isCustom}
+            <button
+              class="pill pill-mid pill-edit"
+              class:active={selectedPersonaId === persona.id}
+              onclick={() => handleStartEditPersona(persona)}
+              aria-label="Edit persona"
+            >✎</button>
+          {/if}
           <button
             class="pill pill-del"
             class:active={selectedPersonaId === persona.id}
@@ -403,7 +493,7 @@
 
     {#if showCreateForm}
       <div class="create-form">
-        <span class="section-eyebrow" style="color: #a78bfa">New persona</span>
+        <span class="section-eyebrow" style="color: #a78bfa">{editingPersonaId ? 'Edit persona' : 'New persona'}</span>
         <div class="create-form-row">
           <input class="input create-icon-input" bind:value={newPersonaIcon} placeholder="🤖" maxlength="4" aria-label="Icon" />
           <input class="input" style="flex:1" bind:value={newPersonaName} placeholder="Name" aria-label="Name" />
@@ -411,8 +501,8 @@
         <input class="input" bind:value={newPersonaDesc} placeholder="Short description" aria-label="Description" />
         <textarea class="text-area create-prompt" bind:value={newPersonaPrompt} placeholder="System prompt — describe how this persona writes…" aria-label="System prompt"></textarea>
         <div class="create-form-actions">
-          <button class="btn btn-primary btn-small" onclick={handleCreatePersona} disabled={!newPersonaName.trim() || !newPersonaPrompt.trim()}>Save</button>
-          <button class="btn btn-ghost btn-small" onclick={() => (showCreateForm = false)}>Cancel</button>
+          <button class="btn btn-primary btn-small" onclick={handleCreatePersona} disabled={!newPersonaName.trim() || !newPersonaPrompt.trim()}>{editingPersonaId ? 'Update' : 'Save'}</button>
+          <button class="btn btn-ghost btn-small" onclick={handleCancelCreateForm}>Cancel</button>
         </div>
       </div>
     {/if}
@@ -664,6 +754,44 @@
       </div>
     {/if}
   </main>
+
+  <!-- ─── Toast / confirm overlay ──────────────────────────────────────────── -->
+  {#if toasts.length > 0 || pendingConfirm}
+    <div class="toast-container" aria-live="polite">
+      {#each toasts as toast (toast.id)}
+        <div class="toast toast-{toast.type}" role="alert">
+          <span class="toast-icon">
+            {#if toast.type === 'success'}✓{:else if toast.type === 'error'}✕{:else if toast.type === 'warn'}⚠{:else}ℹ{/if}
+          </span>
+          <span class="toast-msg">{toast.message}</span>
+          <button class="toast-dismiss" onclick={() => dismissToast(toast.id)} aria-label="Dismiss">×</button>
+        </div>
+      {/each}
+      {#if pendingConfirm}
+        <div class="toast toast-confirm" role="dialog" aria-modal="true">
+          <div class="confirm-content">
+            <span class="confirm-message">{pendingConfirm.message}</span>
+            {#if pendingConfirm.detail}
+              <span class="confirm-detail">{pendingConfirm.detail}</span>
+            {/if}
+          </div>
+          <div class="confirm-actions">
+            <button class="btn btn-ghost btn-small" onclick={dismissConfirm}>
+              {pendingConfirm.cancelLabel ?? 'Cancel'}
+            </button>
+            <button
+              class="btn btn-small"
+              class:btn-danger={pendingConfirm.danger}
+              class:btn-primary={!pendingConfirm.danger}
+              onclick={async () => { const fn = pendingConfirm!.onConfirm; dismissConfirm(); await fn(); }}
+            >
+              {pendingConfirm.confirmLabel ?? 'Confirm'}
+            </button>
+          </div>
+        </div>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -822,6 +950,22 @@
 
   .pill-group { display: inline-flex; align-items: center; }
   .pill-main { border-radius: 20px 0 0 20px; border-right: none; }
+  .pill-mid {
+    border-radius: 0;
+    border-right: none;
+    background: #14141f;
+    border: 1px solid #252535;
+    color: #4b5563;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1;
+    font-family: inherit;
+  }
+  .pill-mid:hover { background: #1e1e30; color: #a78bfa; }
+  .pill-mid.active { background: #3b1f72; border-color: #5b21b6; color: #c4b5fd; }
+  .pill-edit { font-size: 12px; }
   .pill-del {
     background: #14141f;
     border: 1px solid #252535;
@@ -1271,4 +1415,69 @@
   .btn-danger:hover:not(:disabled) { background: #7f1d1d; color: white; }
 
   .btn-small { padding: 4px 10px; font-size: 11px; border-radius: 7px; }
+
+  /* ─── Toast / confirm overlay ────────────────────────────────────────────── */
+  .toast-container {
+    position: fixed;
+    bottom: 14px;
+    left: 12px;
+    right: 12px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+  }
+
+  .toast {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 12px;
+    pointer-events: all;
+    animation: toastIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    border: 1px solid transparent;
+  }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(10px) scale(0.96); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  .toast-success { background: #0a1f14; border-color: #064e27; }
+  .toast-error   { background: #1a0808; border-color: #450c0c; }
+  .toast-warn    { background: #1c0e00; border-color: #451e00; }
+  .toast-info    { background: #110d20; border-color: #2e1f5e; }
+
+  .toast-icon { font-size: 13px; flex-shrink: 0; font-weight: 700; }
+  .toast-success .toast-icon { color: #34d399; }
+  .toast-error   .toast-icon { color: #f87171; }
+  .toast-warn    .toast-icon { color: #fbbf24; }
+  .toast-info    .toast-icon { color: #a78bfa; }
+
+  .toast-msg   { flex: 1; color: #c4c9e0; line-height: 1.4; }
+
+  .toast-dismiss {
+    background: none; border: none; color: #4b5563;
+    cursor: pointer; font-size: 15px; padding: 0 2px;
+    line-height: 1; flex-shrink: 0;
+    transition: color 0.12s;
+  }
+  .toast-dismiss:hover { color: #9ca3af; }
+
+  /* Confirm variant */
+  .toast-confirm {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    background: #14121e;
+    border-color: #312d50;
+  }
+  .confirm-content { display: flex; flex-direction: column; gap: 3px; }
+  .confirm-message { font-size: 12px; font-weight: 600; color: #dde1f0; }
+  .confirm-detail  { font-size: 11px; color: #6b7280; line-height: 1.4; }
+  .confirm-actions { display: flex; gap: 6px; justify-content: flex-end; }
 </style>
