@@ -1,6 +1,6 @@
 # Persona
 
-Persona is a Chrome extension that rewrites text in different writing personas using a local in-browser model (`@huggingface/transformers`).  Nothing leaves your browser and is done locally on your own computer. No analytics, no API calls, just the LLM and your machine.
+Persona is a Chrome extension that rewrites text in different writing personas using a local in-browser model (`@huggingface/transformers`).  Nothing leaves your browser and is done locally on your own computer. No telemetry, no API calls, just the LLM and your machine.
 
 The motivation is to make writing style less consistent across posts and contexts, reducing straightforward stylometric linkability.
 
