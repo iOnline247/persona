@@ -139,6 +139,12 @@
   let totalTransforms = $derived(usageStats.reduce((sum, s) => sum + s.count, 0));
   let totalChars = $derived(usageStats.reduce((sum, s) => sum + s.charactersProcessed, 0));
   let maxStatCount = $derived(usageStats.length > 0 ? Math.max(...usageStats.map((s) => s.count)) : 1);
+  let orphanTransforms = $derived(
+    usageStats.reduce((sum, s) =>
+      sum + Object.entries(s.personaUsage)
+        .filter(([id]) => !activePersonas.some(p => p.id === id))
+        .reduce((a, [, v]) => a + v, 0), 0)
+  );
 
   onMount(async () => {
     const data = await getStorage();
@@ -750,6 +756,15 @@
                 </div>
               {/if}
             {/each}
+            {#if orphanTransforms > 0}
+              <div class="stat-row">
+                <span class="stat-date" style="width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim)">🗑 Deleted</span>
+                <div class="stat-bar-track">
+                  <div class="stat-bar-fill persona-fill" style="width: {totalTransforms > 0 ? Math.min(100, (orphanTransforms / totalTransforms) * 100) : 0}%; opacity: 0.4"></div>
+                </div>
+                <span class="stat-count" style="color:var(--dim)">{orphanTransforms}×</span>
+              </div>
+            {/if}
           </div>
         {/if}
       </div>
