@@ -1,7 +1,6 @@
 import type { StorageData, Draft, WebsitePersona, UsageStat, Persona } from '../types/index.js';
 
 const MAX_DRAFTS = 50;
-const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const DEFAULT_STORAGE: StorageData = {
   websitePersonas: [],
@@ -59,38 +58,6 @@ export async function saveDraft(draft: Omit<Draft, 'id' | 'timestamp'>): Promise
   data.drafts = [newDraft, ...data.drafts].slice(0, MAX_DRAFTS);
   await setStorage({ drafts: data.drafts });
   return newDraft;
-}
-
-/**
- * Save a draft without persisting the raw original text (privacy default).
- * Expired drafts older than DRAFT_TTL_MS are pruned at the same time.
- */
-export async function saveDraftMinimized(
-  draft: Omit<Draft, 'id' | 'timestamp' | 'originalText'>,
-): Promise<Draft> {
-  const now = Date.now();
-  const scrubbed: Draft = {
-    ...draft,
-    originalText: '', // never persist raw source by default
-    id: crypto.randomUUID(),
-    timestamp: now,
-  };
-  const data = await getStorage();
-  data.drafts = [scrubbed, ...data.drafts.filter((d) => now - d.timestamp <= DRAFT_TTL_MS)]
-    .slice(0, MAX_DRAFTS);
-  await setStorage({ drafts: data.drafts });
-  return scrubbed;
-}
-
-/** Remove drafts older than DRAFT_TTL_MS from storage. Returns the kept drafts. */
-export async function purgeExpiredDrafts(): Promise<Draft[]> {
-  const data = await getStorage();
-  const now = Date.now();
-  const filtered = data.drafts.filter((d) => now - d.timestamp <= DRAFT_TTL_MS);
-  if (filtered.length !== data.drafts.length) {
-    await setStorage({ drafts: filtered });
-  }
-  return filtered;
 }
 
 export async function deleteDraft(id: string): Promise<void> {

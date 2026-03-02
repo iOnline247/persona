@@ -230,27 +230,3 @@ export function assessRisk(text: string): RiskAssessment {
 
   return { score, level, signals, confidence: Math.max(0, 1 - score) };
 }
-
-// ---------------------------------------------------------------------------
-// Abstain decision – block output when residual risk is unacceptably high
-// ---------------------------------------------------------------------------
-
-export interface AbstainDecision {
-  abstain: boolean;
-  reason?: string;
-}
-
-const ABSTAIN_RISK_THRESHOLD = 0.7;
-const ABSTAIN_CONFIDENCE_THRESHOLD = 0.5;
-
-/**
- * Returns { abstain: true } when the risk score is critically high AND
- * confidence is too low to trust the output.  Callers should suppress output
- * and show the reason string to the user instead.
- */
-export function shouldAbstain(riskScore: number, confidence: number): AbstainDecision {
-  if (riskScore >= ABSTAIN_RISK_THRESHOLD && confidence < ABSTAIN_CONFIDENCE_THRESHOLD) {
-    return { abstain: true, reason: 'High residual deanonymization risk' };
-  }
-  return { abstain: false };
-}
