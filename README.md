@@ -12,6 +12,30 @@ Persona provides heuristic style transformation.
 It does **not** guarantee anonymity or resistance against all authorship/deanonymization methods.
 Use it as a privacy-assistance layer, not as a sole protection mechanism for high-risk use cases.
 
+## Look and Feel
+
+### Transform
+
+Choose a persona or create one, add your text, then transform.  
+![Transform](./docs/img//transform.png)
+
+### Drafts
+
+Just in case you need to let something simmer...  
+![Drafts](./docs/img/drafts.png)
+
+### Sites
+
+For commonly used websites, this allows you to store a preset persona.  
+![Sites](./docs/img/sites.png)
+
+### Stats
+
+For the nerds.  
+![Stats](./docs/img/stats.png)
+
+
+
 ## Current features
 
 - Local text rewriting with `HuggingFaceTB/SmolLM2-135M-Instruct`
