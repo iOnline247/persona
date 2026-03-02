@@ -845,7 +845,7 @@
     z-index: 99999;
   }
 
-  /* ─── shell App */ ───────────────────────────────────────────────────────────
+  /* ─── shell App ─────────────────────────────────────────────────────────── */
   .app { display: flex; flex-direction: column; min-height: 100vh; }
 
    /* ─── Header ────────────────────────────────────────────────────── */
@@ -1200,7 +1200,7 @@
     flex-shrink: 0;
   }
 
-  /* ─── Quality card */ ─────────────────────────────────────
+  /* ─── Quality card ───────────────────────────────────── */
   .quality-card {
     background: var(--bg-1);
     border: 1px solid var(--border);
@@ -1371,13 +1371,13 @@
   .stat-count { width: 26px; color: var(--dim); text-align: right; flex-shrink: 0; font-size: 9px; }
   .stat-top   { width: 76px; color: var(--dim); font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
 
-  /* ─── Empty states */ ───────────────────────────────────────────────
+  /* ─── Empty states ─────────────────────────────────────────────── */
   .empty-state { text-align: center; padding: 40px 20px; color: var(--dim); }
   .empty-icon  { font-size: 26px; display: block; margin-bottom: 10px; filter: grayscale(1) brightness(0.5); }
   .empty-state p { font-size: 10px; margin-bottom: 4px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; }
   .hint          { font-size: 9px; color: var(--border-hi); text-transform: uppercase; letter-spacing: 0.08em; }
 
-  /* ─── inputs Form */ ───────────────────────────────────────────────
+  /* ─── inputs Form ─────────────────────────────────────────────── */
   .input {
     flex: 1;
     background: var(--bg-1);
