@@ -446,68 +446,6 @@
     {/if}
   </header>
 
-  <!-- ─── Persona bar ──────────────────────────────────────────────────────── -->
-  <div class="persona-section">
-    <div class="persona-bar-header">
-      <span class="section-eyebrow">Persona</span>
-      <div class="persona-bar-actions">
-        <button class="ghost-btn ghost-accent" onclick={() => { if (showCreateForm) handleCancelCreateForm(); else showCreateForm = true; }}>
-          {showCreateForm ? '✕ Cancel' : '+ New'}
-        </button>
-        <button class="ghost-btn" onclick={handleRestoreDefaults} title="Restore default personas">↺ Restore</button>
-      </div>
-    </div>
-    <div class="persona-pills">
-      <button class="pill" class:active={selectedPersonaId === 'random'} onclick={() => handleSelectPersona('random')}>
-        🎲 Random
-      </button>
-      {#each sortedPersonas as persona (persona.id)}
-        {@const count = personaUsageCounts[persona.id] ?? 0}
-        {@const isCustom = !PERSONAS.some((p) => p.id === persona.id)}
-        <div class="pill-group">
-          <button
-            class="pill pill-main"
-            class:active={selectedPersonaId === persona.id}
-            onclick={() => handleSelectPersona(persona.id)}
-            title={persona.description}
-          >
-            {persona.icon} {persona.name}{#if count > 0}<span class="pill-count"> {count}</span>{/if}
-          </button>
-          {#if isCustom}
-            <button
-              class="pill pill-mid pill-edit"
-              class:active={selectedPersonaId === persona.id}
-              onclick={() => handleStartEditPersona(persona)}
-              aria-label="Edit persona"
-            >✎</button>
-          {/if}
-          <button
-            class="pill pill-del"
-            class:active={selectedPersonaId === persona.id}
-            onclick={() => handleDeletePersona(persona.id)}
-            aria-label="Delete persona"
-          >×</button>
-        </div>
-      {/each}
-    </div>
-
-    {#if showCreateForm}
-      <div class="create-form">
-        <span class="section-eyebrow" style="color: #a78bfa">{editingPersonaId ? 'Edit persona' : 'New persona'}</span>
-        <div class="create-form-row">
-          <input class="input create-icon-input" bind:value={newPersonaIcon} placeholder="🤖" maxlength="4" aria-label="Icon" />
-          <input class="input" style="flex:1" bind:value={newPersonaName} placeholder="Name" aria-label="Name" />
-        </div>
-        <input class="input" bind:value={newPersonaDesc} placeholder="Short description" aria-label="Description" />
-        <textarea class="text-area create-prompt" bind:value={newPersonaPrompt} placeholder="System prompt — describe how this persona writes…" aria-label="System prompt"></textarea>
-        <div class="create-form-actions">
-          <button class="btn btn-primary btn-small" onclick={handleCreatePersona} disabled={!newPersonaName.trim() || !newPersonaPrompt.trim()}>{editingPersonaId ? 'Update' : 'Save'}</button>
-          <button class="btn btn-ghost btn-small" onclick={handleCancelCreateForm}>Cancel</button>
-        </div>
-      </div>
-    {/if}
-  </div>
-
   <!-- ─── Tabs ─────────────────────────────────────────────────────────────── -->
   <nav class="tabs">
     <button class:active={activeTab === 'transform'} onclick={() => (activeTab = 'transform')}>Transform</button>
@@ -524,6 +462,68 @@
   <main>
     {#if activeTab === 'transform'}
       <div class="transform-tab">
+
+        <!-- ─── Persona bar ────────────────────────────────────────────── -->
+        <div class="persona-section">
+          <div class="persona-bar-header">
+            <span class="section-eyebrow">Persona</span>
+            <div class="persona-bar-actions">
+              <button class="ghost-btn ghost-accent" onclick={() => { if (showCreateForm) handleCancelCreateForm(); else showCreateForm = true; }}>
+                {showCreateForm ? '✕ Cancel' : '+ New'}
+              </button>
+              <button class="ghost-btn" onclick={handleRestoreDefaults} title="Restore default personas">↺ Restore</button>
+            </div>
+          </div>
+          <div class="persona-pills">
+            <button class="pill" class:active={selectedPersonaId === 'random'} onclick={() => handleSelectPersona('random')}>
+              🎲 Random
+            </button>
+            {#each sortedPersonas as persona (persona.id)}
+              {@const count = personaUsageCounts[persona.id] ?? 0}
+              {@const isCustom = !PERSONAS.some((p) => p.id === persona.id)}
+              <div class="pill-group">
+                <button
+                  class="pill pill-main"
+                  class:active={selectedPersonaId === persona.id}
+                  onclick={() => handleSelectPersona(persona.id)}
+                  title={persona.description}
+                >
+                  {persona.icon} {persona.name}{#if count > 0}<span class="pill-count"> {count}</span>{/if}
+                </button>
+                {#if isCustom}
+                  <button
+                    class="pill pill-mid pill-edit"
+                    class:active={selectedPersonaId === persona.id}
+                    onclick={() => handleStartEditPersona(persona)}
+                    aria-label="Edit persona"
+                  >✎</button>
+                {/if}
+                <button
+                  class="pill pill-del"
+                  class:active={selectedPersonaId === persona.id}
+                  onclick={() => handleDeletePersona(persona.id)}
+                  aria-label="Delete persona"
+                >×</button>
+              </div>
+            {/each}
+          </div>
+
+          {#if showCreateForm}
+            <div class="create-form">
+              <span class="section-eyebrow" style="color: #a78bfa">{editingPersonaId ? 'Edit persona' : 'New persona'}</span>
+              <div class="create-form-row">
+                <input class="input create-icon-input" bind:value={newPersonaIcon} placeholder="🤖" maxlength="4" aria-label="Icon" />
+                <input class="input" style="flex:1" bind:value={newPersonaName} placeholder="Name" aria-label="Name" />
+              </div>
+              <input class="input" bind:value={newPersonaDesc} placeholder="Short description" aria-label="Description" />
+              <textarea class="text-area create-prompt" bind:value={newPersonaPrompt} placeholder="System prompt — describe how this persona writes…" aria-label="System prompt"></textarea>
+              <div class="create-form-actions">
+                <button class="btn btn-primary btn-small" onclick={handleCreatePersona} disabled={!newPersonaName.trim() || !newPersonaPrompt.trim()}>{editingPersonaId ? 'Update' : 'Save'}</button>
+                <button class="btn btn-ghost btn-small" onclick={handleCancelCreateForm}>Cancel</button>
+              </div>
+            </div>
+          {/if}
+        </div>
 
         <!-- Input -->
         <div class="text-section">
@@ -725,12 +725,13 @@
           <div class="stats-block">
             <h3 class="block-title">Recent activity</h3>
             {#each [...usageStats].reverse() as stat (stat.date)}
+              {@const topEntry = Object.entries(stat.personaUsage).sort((a, b) => b[1] - a[1])[0]}
               <div class="stat-row">
                 <span class="stat-date">{formatDate(stat.date)}</span>
                 <div class="stat-bar-track">
                   <div class="stat-bar-fill" style="width: {Math.min(100, (stat.count / maxStatCount) * 100)}%"></div>
                 </div>
-                <span class="stat-count">{stat.count}×</span>
+                <span class="stat-count">{topEntry ? topEntry[1] : 0}×</span>
                 <span class="stat-top">{getTopPersonaForStat(stat)}</span>
               </div>
             {/each}
@@ -1368,8 +1369,8 @@
   .stat-bar-fill  { height: 100%; background: var(--accent); min-width: 2px; }
   .stat-bar-fill.persona-fill { background: var(--cyan); }
 
-  .stat-count { width: 26px; color: var(--dim); text-align: right; flex-shrink: 0; font-size: 11px; }
-  .stat-top   { width: 76px; color: var(--dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+  .stat-count { width: 34px; color: var(--dim); text-align: right; flex-shrink: 0; font-size: 11px; }
+  .stat-top   { width: 130px; color: var(--dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
 
   /* ─── Empty states ─────────────────────────────────────────────── */
   .empty-state { text-align: center; padding: 40px 20px; color: var(--dim); }
